@@ -100,9 +100,9 @@ class LdaMalletWithBeta(LdaMallet):
 def main(args):
 
     np.random.seed(args.seed)
-    x_train = load_sparse(args.train_fpath)
+    x_train = load_sparse(args.train_path)
 
-    if not args.eval_fpath and args.eval_split and args.eval_split > 0:
+    if not args.eval_path and args.eval_split and args.eval_split > 0:
         split_idx = np.random.choice(
             (True, False),
             size=x_train.shape[0],
@@ -112,14 +112,14 @@ def main(args):
     else:
         x_val = x_train
 
-    if args.eval_fpath:
-        x_val = load_sparse(args.eval_fpath)
+    if args.eval_path:
+        x_val = load_sparse(args.eval_path)
     x_train = Sparse2Corpus(x_train, documents_columns=False)
 
     # load the vocabulary
     vocab = None
-    if args.vocab_fpath is not None:
-        vocab = load_json(args.vocab_fpath)
+    if args.vocab_path is not None:
+        vocab = load_json(args.vocab_path)
         inv_vocab = {i: v for v, i in vocab.items()}
 
     if args.model == "gensim":
@@ -199,9 +199,9 @@ if __name__ == "__main__":
     parser.add("--temp_output_dir", default=None, help="Temporary model storage during run, when I/O bound")
 
     parser.add("--output_dir", required=True, default=None)
-    parser.add("--train_fpath", default="train.dtm.npz")
+    parser.add("--train_path", default="train.dtm.npz")
     parser.add("--eval_path", default="val.dtm.npz")
-    parser.add("--vocab_fpath", default="vocab.json")
+    parser.add("--vocab_path", default="vocab.json")
     parser.add("--eval_split", default=None, type=float)
 
     # Model-specific hyperparams
@@ -259,13 +259,15 @@ if __name__ == "__main__":
         output_dir.mkdir(exist_ok=True, parents=True)
 
         args.seed = seed
-        args.output_dir = args.temp_output_dir or str(output_dir)
+        args.output_dir = output_dir
+        if args.temp_output_dir: # if using, say, scratch space: reassign output dir
+            args.output_dir = Path(args.temp_output_dir, output_dir.name)
     
         # train
         print(f"\nOn run {i} of {len(args.run_seeds)}")
         model, metrics = main(args)
         
-        if args.temp_output_dir:
+        if args.temp_output_dir: # copy from scratch back to the original
             shutil.copytree(args.output_dir, output_dir, dirs_exist_ok=True)
 
 
