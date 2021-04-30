@@ -13,7 +13,7 @@ from gensim.matutils import Sparse2Corpus
 from gensim.models.wrappers import LdaMallet
 from gensim.models.ldamulticore import LdaMulticore, LdaModel
 
-from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_json
+from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_json, save_topics
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ PATH_TO_MALLET_BINARY = "/workspace/kd-topic-modeling/Mallet/bin/mallet"
 
 
 class LdaMalletWithBeta(LdaMallet):
-    def __init__(self, beta=None, num_top_words=20, *args, **kwargs):
+    def __init__(self, beta=None, num_top_words=50, *args, **kwargs):
         self.beta = beta
         self.num_top_words = num_top_words
 
@@ -100,6 +100,11 @@ class LdaMalletWithBeta(LdaMallet):
 def main(args):
 
     np.random.seed(args.seed)
+    if args.input_dir is not None:
+        args.train_path = Path(args.input_dir,  args.train_path)
+        args.eval_path = Path(args.input_dir, args.eval_path)
+        args.vocab_path = Path(args.input_dir, args.vocab_path)
+
     x_train = load_sparse(args.train_path)
 
     if not args.eval_path and args.eval_split and args.eval_split > 0:
@@ -150,6 +155,7 @@ def main(args):
             id2word=inv_vocab,
             alpha=args.alpha,
             beta=args.beta,
+            num_top_words=args.topic_words_to_save,
             optimize_interval=args.optimize_interval,
             topic_threshold=0.,
             iterations=args.iterations,
@@ -166,14 +172,25 @@ def main(args):
             topics=topics, vocab=vocab, n=args.eval_words
         ))
         topic_terms, npmi = lda.return_optimal_topic_terms(npmi_score_fn)
+        save_topics(
+            topic_terms,
+            fpath=Path(args.output_dir, "topics.txt"),
+            n=args.topic_words_to_save,
+        )
     else:
-        topics = lda.get_topics()
-        topic_terms = [word_probs.argsort()[::-1] for word_probs in topics]
+        est_beta = lda.get_topics()
+        topic_terms = [word_probs.argsort()[::-1] for word_probs in est_beta]
         npmi = npmi_scorer.compute_npmi(topics=topic_terms, n=args.eval_words)
+        save_topics(
+            [[inv_vocab[w] for w in topic[:100]] for topic in topic_terms],
+            fpath=Path(args.output_dir, "topics.txt"),
+            n=args.topic_words_to_save,
+        )
+        np.save(Path(args.output_dir, "beta.npy"), est_beta)
 
-    tu = compute_tu(topic_terms, l=args.eval_words)
+    tu = compute_tu(topic_terms, n=args.eval_words)
     to, overlaps = compute_to(topic_terms, n=args.eval_words, return_overlaps=True)
-    n_overlaps = np.sum(overlaps == args.eval_words)
+    n_overlaps = int(np.sum(overlaps == args.eval_words))
     metrics = {
         'npmi': npmi,
         'npmi_mean': np.mean(npmi),
@@ -182,7 +199,6 @@ def main(args):
         'to': to,
         'entire_overlaps': n_overlaps,
     }
-    np.save(Path(args.output_dir, "beta.npy"), topics)
     save_json(metrics, Path(args.output_dir, "metrics.json"))
 
     return lda, metrics
@@ -223,6 +239,7 @@ if __name__ == "__main__":
     # Evaluation
     parser.add("--eval_words", default=10, type=int)
     parser.add("--optimize_for_coherence", action="store_true", default=False)
+    parser.add("--topic_words_to_save", default=50, type=int)
 
     # Run settings
     parser.add("--run_seeds", default=[42], type=int, nargs="+", help="Seeds to use for each run")
@@ -261,7 +278,8 @@ if __name__ == "__main__":
         args.seed = seed
         args.output_dir = output_dir
         if args.temp_output_dir: # if using, say, scratch space: reassign output dir
-            args.output_dir = Path(args.temp_output_dir, output_dir.name)
+            args.output_dir = Path(args.temp_output_dir, str(np.random.randint(1000)))
+            args.output_dir.mkdir(exist_ok=True, parents=True)
     
         # train
         print(f"\nOn run {i} of {len(args.run_seeds)}")
@@ -269,6 +287,7 @@ if __name__ == "__main__":
         
         if args.temp_output_dir: # copy from scratch back to the original
             shutil.copytree(args.output_dir, output_dir, dirs_exist_ok=True)
+            shutil.rmtree(args.output_dir) # remove temporary directory
 
 
     # Aggregate results

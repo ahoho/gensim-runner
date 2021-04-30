@@ -24,14 +24,13 @@ def save_json(obj: Any, fpath: Union[Path, str]):
         return json.dump(obj, outfile)
 
 
-def save_topics(sorted_topics, inv_vocab, fpath, n=100):
+def save_topics(sorted_topics, fpath, n=100):
     """
     Save topics to disk
     """
     with open(fpath, "w") as outfile:
-        for v in sorted_topics:
-            topic = [inv_vocab[i] for i in v]
-            outfile.write(" ".join(topic) + "\n")
+        for topic in sorted_topics:
+            outfile.write(" ".join(topic[:n]) + "\n")
 
 class NPMI:
     def __init__(
