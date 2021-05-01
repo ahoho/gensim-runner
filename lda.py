@@ -267,13 +267,16 @@ if __name__ == "__main__":
         args.iterations = 1000 if args.iterations is None else args.iterations
 
     # Run for each seed
-    base_output_dir = args.output_dir
-    Path(base_output_dir).mkdir(exist_ok=True, parents=True)
+    base_output_dir = Path(args.output_dir)
+    base_output_dir.mkdir(exist_ok=True, parents=True)
 
     for i, seed in enumerate(args.run_seeds):
         # make subdirectories for each run
-        output_dir = Path(base_output_dir, str(seed))
-        output_dir.mkdir(exist_ok=True, parents=True)
+        if len(args.run_seeds) == 1:
+            output_dir = base_output_dir
+        else:
+            output_dir = Path(base_output_dir, str(seed))
+            output_dir.mkdir(exist_ok=True, parents=True)
 
         args.seed = seed
         args.output_dir = output_dir
@@ -284,11 +287,14 @@ if __name__ == "__main__":
         # train
         print(f"\nOn run {i} of {len(args.run_seeds)}")
         model, metrics = main(args)
+
+        # remove temp files to save space
+        Path(args.output_dir, "corpus.txt").unlink(missing_ok=True)
+        Path(args.output_dir, "corpus.mallet").unlink(missing_ok=True)
         
         if args.temp_output_dir: # copy from scratch back to the original
             shutil.copytree(args.output_dir, output_dir, dirs_exist_ok=True)
             shutil.rmtree(args.output_dir) # remove temporary directory
-
 
     # Aggregate results
     if len(args.run_seeds) > 1:
