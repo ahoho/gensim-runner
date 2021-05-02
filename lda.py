@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
+from gensim.utils import open as gensim_open
 from gensim.matutils import Sparse2Corpus
 from gensim.models.wrappers import LdaMallet
 from gensim.models.ldamulticore import LdaMulticore, LdaModel
@@ -18,7 +19,6 @@ from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_jso
 logger = logging.getLogger(__name__)
 
 PATH_TO_MALLET_BINARY = "/workspace/kd-topic-modeling/Mallet/bin/mallet"
-
 
 
 class LdaMalletWithBeta(LdaMallet):
@@ -31,7 +31,31 @@ class LdaMalletWithBeta(LdaMallet):
         self.training_scores = None
 
         super().__init__(*args, **kwargs)
-    
+
+    def convert_input(self, corpus, infer=False, serialize_corpus=True):
+        if serialize_corpus:
+            logger.info("serializing temporary corpus to %s", self.fcorpustxt())
+            with gensim_open(self.fcorpustxt(), 'wb') as fout:
+                self.corpus2mallet(corpus, fout)
+
+        # convert the text file above into MALLET's internal format
+        import pdb; pdb.set_trace()
+        args = [
+            self.mallet_path,
+            "import-file",
+            "--preserve-case",
+            "--keep-sequence",
+            "--token-regex", "\"\\S+\"",
+            "--input", f"{self.fcorpustxt()}",
+        ]
+        if infer:
+            args += ['--use-pipe-from ', self.fcorpusmallet()]
+            args += ["--output", f"{self.fcorpusmallet()}.infer"]
+        else:
+            args += ["--output", f"{self.fcorpusmallet()}"]
+        logger.info("converting temporary corpus to MALLET format")
+        subprocess.run(args=args)
+
     def train(self, corpus):
         self.convert_input(corpus, infer=False)
         args = [
