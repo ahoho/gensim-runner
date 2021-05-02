@@ -39,7 +39,6 @@ class LdaMalletWithBeta(LdaMallet):
                 self.corpus2mallet(corpus, fout)
 
         # convert the text file above into MALLET's internal format
-        import pdb; pdb.set_trace()
         args = [
             self.mallet_path,
             "import-file",
