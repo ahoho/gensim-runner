@@ -44,7 +44,7 @@ class LdaMalletWithBeta(LdaMallet):
             "import-file",
             "--preserve-case",
             "--keep-sequence",
-            "--token-regex", "\"\\S+\"",
+            "--token-regex", r"\S+",
             "--input", f"{self.fcorpustxt()}",
         ]
         if infer:
