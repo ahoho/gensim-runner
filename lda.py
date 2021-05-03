@@ -130,6 +130,9 @@ def main(args):
 
     x_train = load_sparse(args.train_path)
 
+    if args.save_all_topics:
+        Path(args.output_dir, "topics").mkdir(exist_ok=True)
+
     if not args.eval_path and args.eval_split and args.eval_split > 0:
         split_idx = np.random.choice(
             (True, False),
@@ -195,11 +198,19 @@ def main(args):
             topics=topics, vocab=vocab, n=args.eval_words
         ))
         topic_terms, npmi = lda.return_optimal_topic_terms(npmi_score_fn)
+        # TODO: full NPMI, not mean
         save_topics(
             topic_terms,
             fpath=Path(args.output_dir, "topics.txt"),
             n=args.topic_words_to_save,
         )
+        if args.save_all_topics:
+            for i, topic_terms_i in enumerate(lda.training_topics):
+                save_topics(
+                    topic_terms_i,
+                    fpath=Path(args.output_dir, "topics", f"{i}.txt"),
+                    n=args.topic_words_to_save,
+                )
     else:
         est_beta = lda.get_topics()
         topic_terms = [word_probs.argsort()[::-1] for word_probs in est_beta]
@@ -263,6 +274,7 @@ if __name__ == "__main__":
     parser.add("--eval_words", default=10, type=int)
     parser.add("--optimize_for_coherence", action="store_true", default=False)
     parser.add("--topic_words_to_save", default=50, type=int)
+    parser.add("--save_all_topics", action="store_true", default=True)
 
     # Run settings
     parser.add("--run_seeds", default=[42], type=int, nargs="+", help="Seeds to use for each run")
