@@ -32,28 +32,28 @@ class LdaMalletWithBeta(LdaMallet):
 
         super().__init__(*args, **kwargs)
 
-    def convert_input(self, corpus, infer=False, serialize_corpus=True):
-        if serialize_corpus:
-            logger.info("serializing temporary corpus to %s", self.fcorpustxt())
-            with gensim_open(self.fcorpustxt(), 'wb') as fout:
-                self.corpus2mallet(corpus, fout)
+    # def convert_input(self, corpus, infer=False, serialize_corpus=True):
+    #     if serialize_corpus:
+    #         logger.info("serializing temporary corpus to %s", self.fcorpustxt())
+    #         with gensim_open(self.fcorpustxt(), 'wb') as fout:
+    #             self.corpus2mallet(corpus, fout)
 
-        # convert the text file above into MALLET's internal format
-        args = [
-            self.mallet_path,
-            "import-file",
-            "--preserve-case",
-            "--keep-sequence",
-            "--token-regex", r"\S+",
-            "--input", f"{self.fcorpustxt()}",
-        ]
-        if infer:
-            args += ['--use-pipe-from ', self.fcorpusmallet()]
-            args += ["--output", f"{self.fcorpusmallet()}.infer"]
-        else:
-            args += ["--output", f"{self.fcorpusmallet()}"]
-        logger.info("converting temporary corpus to MALLET format")
-        subprocess.run(args=args)
+    #     # convert the text file above into MALLET's internal format
+    #     args = [
+    #         self.mallet_path,
+    #         "import-file",
+    #         "--preserve-case",
+    #         "--keep-sequence",
+    #         "--token-regex", r"\S+",
+    #         "--input", f"{self.fcorpustxt()}",
+    #     ]
+    #     if infer:
+    #         args += ['--use-pipe-from ', self.fcorpusmallet()]
+    #         args += ["--output", f"{self.fcorpusmallet()}.infer"]
+    #     else:
+    #         args += ["--output", f"{self.fcorpusmallet()}"]
+    #     logger.info("converting temporary corpus to MALLET format")
+    #     subprocess.run(args=args)
 
     def train(self, corpus):
         self.convert_input(corpus, infer=False)
