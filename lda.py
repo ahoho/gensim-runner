@@ -233,9 +233,9 @@ def main(args):
     to, overlaps = compute_to(topic_terms, n=args.eval_words, return_overlaps=True)
     n_overlaps = int(np.sum(overlaps == args.eval_words))
     metrics = {
-        'npmi': npmi,
+        #'npmi': npmi,
         'npmi_mean': np.mean(npmi),
-        'tu': tu,
+        #'tu': tu,
         'tu_mean': np.mean(tu),
         'to': to,
         'entire_overlaps': n_overlaps,
@@ -287,7 +287,8 @@ if __name__ == "__main__":
     parser.add("--run_seeds", default=[42], type=int, nargs="+", help="Seeds to use for each run")
     parser.add("--workers", default=4, type=int)
     args = parser.parse_args()
-
+    if args.optimize_for_coherence:
+        raise DeprecationWarning("Optimizing for coherence no longer supported.")
     if args.model == "gensim":
         args.alpha = "symmetric" if args.alpha is None else args.alpha
         args.eta = "symmetric" if args.eta is None else args.eta
