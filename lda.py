@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
-from gensim.utils import open as gensim_open
+from gensim import utils
 from gensim.matutils import Sparse2Corpus
 from gensim.models.wrappers import LdaMallet
 from gensim.models.ldamulticore import LdaMulticore, LdaModel
@@ -32,28 +32,35 @@ class LdaMalletWithBeta(LdaMallet):
 
         super().__init__(*args, **kwargs)
 
-    # def convert_input(self, corpus, infer=False, serialize_corpus=True):
-    #     if serialize_corpus:
-    #         logger.info("serializing temporary corpus to %s", self.fcorpustxt())
-    #         with gensim_open(self.fcorpustxt(), 'wb') as fout:
-    #             self.corpus2mallet(corpus, fout)
+    def convert_input(self, corpus, infer=False, serialize_corpus=True):
+        """Convert corpus to Mallet format and save it to a temporary text file.
+        Identical to the original `convert_input` but does not remove stopwords.
+        Parameters
+        ----------
+        corpus : iterable of iterable of (int, int)
+            Collection of texts in BoW format.
+        infer : bool, optional
+            ...
+        serialize_corpus : bool, optional
+            ...
+        """
+        if serialize_corpus:
+            logger.info("serializing temporary corpus to %s", self.fcorpustxt())
+            with utils.open(self.fcorpustxt(), 'wb') as fout:
+                self.corpus2mallet(corpus, fout)
 
-    #     # convert the text file above into MALLET's internal format
-    #     args = [
-    #         self.mallet_path,
-    #         "import-file",
-    #         "--preserve-case",
-    #         "--keep-sequence",
-    #         "--token-regex", r"\S+",
-    #         "--input", f"{self.fcorpustxt()}",
-    #     ]
-    #     if infer:
-    #         args += ['--use-pipe-from ', self.fcorpusmallet()]
-    #         args += ["--output", f"{self.fcorpusmallet()}.infer"]
-    #     else:
-    #         args += ["--output", f"{self.fcorpusmallet()}"]
-    #     logger.info("converting temporary corpus to MALLET format")
-    #     subprocess.run(args=args)
+        # convert the text file above into MALLET's internal format
+        cmd = \
+            self.mallet_path + \
+            " import-file --preserve-case --keep-sequence " \
+            "--token-regex \"\\S+\" --input %s --output %s"
+        if infer:
+            cmd += ' --use-pipe-from ' + self.fcorpusmallet()
+            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet() + '.infer')
+        else:
+            cmd = cmd % (self.fcorpustxt(), self.fcorpusmallet())
+        logger.info("converting temporary corpus to MALLET format with %s", cmd)
+        utils.check_output(args=cmd, shell=True)
 
     def train(self, corpus):
         self.convert_input(corpus, infer=False)
@@ -226,9 +233,9 @@ def main(args):
     to, overlaps = compute_to(topic_terms, n=args.eval_words, return_overlaps=True)
     n_overlaps = int(np.sum(overlaps == args.eval_words))
     metrics = {
-        #'npmi': npmi,
+        'npmi': npmi,
         'npmi_mean': np.mean(npmi),
-        #'tu': tu,
+        'tu': tu,
         'tu_mean': np.mean(tu),
         'to': to,
         'entire_overlaps': n_overlaps,
