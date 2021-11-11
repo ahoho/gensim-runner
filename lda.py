@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
     # Model-specific hyperparams
     parser.add("--num_topics", default=None, type=int)
-    parser.add("--model", required=True, choices=["mallet", "gensim"])
+    parser.add("--model", default="mallet", required=True, choices=["mallet", "gensim"])
     
     parser.add("--alpha", default=None)
     parser.add("--iterations", default=None, type=int)
