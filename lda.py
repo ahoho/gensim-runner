@@ -18,9 +18,6 @@ from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_jso
 
 logger = logging.getLogger(__name__)
 
-PATH_TO_MALLET_BINARY = "/workspace/kd-topic-modeling/Mallet/bin/mallet"
-
-
 class LdaMalletWithBeta(LdaMallet):
     def __init__(self, beta=None, num_top_words=50, *args, **kwargs):
         self.beta = beta
@@ -128,7 +125,6 @@ class LdaMalletWithBeta(LdaMallet):
         
 
 def main(args):
-
     np.random.seed(args.seed)
     if args.input_dir is not None:
         args.train_path = Path(args.input_dir,  args.train_path)
@@ -182,7 +178,7 @@ def main(args):
 
     if args.model == "mallet":
         lda = LdaMalletWithBeta(
-            mallet_path=PATH_TO_MALLET_BINARY,
+            mallet_path=args.mallet_path,
             corpus=x_train,
             num_topics=args.num_topics,
             id2word=inv_vocab,
@@ -245,6 +241,7 @@ def main(args):
     return lda, metrics
 
 if __name__ == "__main__":
+
     parser = configargparse.ArgParser(
         description="parse args",
         config_file_parser_class=configargparse.YAMLConfigFileParser
@@ -276,6 +273,7 @@ if __name__ == "__main__":
     ## Mallet-only
     parser.add("--beta", default=0.01, type=float)
     parser.add("--optimize_interval", type=int, default=0)
+    parser.add("--mallet_path", default=None)
     
     # Evaluation
     parser.add("--eval_words", default=10, type=int)
