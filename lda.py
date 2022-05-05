@@ -1,5 +1,6 @@
 import logging
 import re
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,7 +19,8 @@ from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_jso
 
 logger = logging.getLogger(__name__)
 
-PATH_TO_MALLET_BINARY = "/workspace/kd-topic-modeling/Mallet/bin/mallet"
+os.environ["MALLET_MEMORY"] = "60g"
+PATH_TO_MALLET_BINARY = "/workspace/java-bins/Mallet-202108/bin/mallet"
 
 
 class LdaMalletWithBeta(LdaMallet):
