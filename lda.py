@@ -19,9 +19,6 @@ from utils import NPMI, compute_tu, compute_to, load_sparse, load_json, save_jso
 
 logger = logging.getLogger(__name__)
 
-os.environ["MALLET_MEMORY"] = "60g"
-PATH_TO_MALLET_BINARY = "/workspace/java-bins/Mallet-202108/bin/mallet"
-
 
 class LdaMalletWithBeta(LdaMallet):
     def __init__(self, beta=None, num_top_words=50, *args, **kwargs):
