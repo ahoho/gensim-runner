@@ -95,9 +95,10 @@ def retrieve_estimates(model_dir, eval_data=None, mallet_path=None, **kwargs):
     doc_topic_gensim = lda.__getitem__(eval_data, iterations=100) # default is 100
 
     # convert to numpy
-    doc_topic = np.zeros((len(doc_topic_gensim), len(doc_topic_gensim[0])), dtype=np.float32)
+    doc_topic = np.zeros((len(doc_topic_gensim), config["num_topics"]), dtype=np.float32)
     for doc_idx, doc in enumerate(doc_topic_gensim):
-        doc_topic[doc_idx] = [v for _, v in doc]
+        for topic_idx, prob in doc:
+            doc_topic[doc_idx, topic_idx] = prob
     
     # finally, remove the unnecessary files
     (model_dir / "corpus.txt").unlink()
@@ -111,8 +112,10 @@ if __name__ == "__main__":
     parser.add_argument("--model_dir")
     parser.add_argument("--inference_data_file")
     parser.add_argument("--mallet_path", default=None)
-    parser.add_argument("--output_dir")
+    parser.add_argument("--output_fpath") # this is ignored
     args = parser.parse_args()
+
+    assert Path(args.model_dir, "inferencer.mallet").exists(), f"Model does not exist at {args.model_dir}/inferencer.mallet"
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.INFO)
@@ -121,9 +124,14 @@ if __name__ == "__main__":
     logger.addHandler(handler)
 
     eval_data = load_sparse(args.inference_data_file)
-    retrieve_estimates(
+    doc_topic = retrieve_estimates(
         model_dir=args.model_dir,
         eval_data=eval_data,
-        output_dir=args.output_dir,
         mallet_path=args.mallet_path,
     )
+    
+    if args.output_fpath.endswith(".txt"):
+        shutil.move(Path(args.model_dir, "doctopics.txt.infer"), args.output_fpath)
+    else:
+        np.save(args.output_fpath, doc_topic)
+        Path(args.model_dir, "doctopics.txt.infer").unlink()
