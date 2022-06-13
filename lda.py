@@ -124,13 +124,29 @@ class LdaMalletWithBeta(LdaMallet):
             self.training_topics = self.parse_log(self.training_log)
         scores = [score_fn(topics) for topics in self.training_topics]
         return self.training_topics[np.argmax(scores)], np.max(scores)
+
+
+def gensim_doc_topic_to_numpy(lda, corpus):
+    """Transform gensim doc topic to numpy"""
+    if isinstance(lda, (LdaModel, LdaMulticore)):
+        doc_topic_gensim = lda.get_document_topics(corpus)
+    elif isinstance(lda, (LdaMallet, LdaMalletWithBeta)):
+        doc_topic_gensim = lda.__getitem__(corpus, iterations=100)
+    else:
+        raise ValueError(f"Model {type(lda)} not supported")
+    doc_topic = np.zeros((len(doc_topic_gensim), lda.num_topics), dtype=np.float32)
+    for doc_idx, doc in enumerate(doc_topic_gensim):
+        for topic_idx, prob in doc:
+            doc_topic[doc_idx, topic_idx] = prob
+    return doc_topic
         
 
 def main(args):
     np.random.seed(args.seed)
     if args.input_dir is not None:
         args.train_path = Path(args.input_dir,  args.train_path)
-        args.eval_path = Path(args.input_dir, args.eval_path)
+        if args.eval_path is not None:
+            args.eval_path = Path(args.input_dir, args.eval_path)
         args.vocab_path = Path(args.input_dir, args.vocab_path)
 
     x_train = load_sparse(args.train_path)
@@ -145,12 +161,15 @@ def main(args):
             p=(1-args.eval_split, args.eval_split),
         )
         x_train, x_val = x_train[split_idx], x_train[~split_idx]
+    elif args.eval_path:
+        x_val = load_sparse(args.eval_path)
     else:
         x_val = x_train
 
-    if args.eval_path:
-        x_val = load_sparse(args.eval_path)
+    npmi_scorer = NPMI((x_val > 0).astype(int))
+    
     x_train = Sparse2Corpus(x_train, documents_columns=False)
+    x_val = Sparse2Corpus(x_val, documents_columns=False)
 
     # load the vocabulary
     vocab = None
@@ -195,37 +214,22 @@ def main(args):
             random_seed=args.seed,
         )
 
-    npmi_scorer = NPMI((x_val > 0).astype(int))
-    if args.optimize_for_coherence:
-        # TODO: currently only implemented for LdaMallet
-        # TODO: support other coherence measures
-        npmi_score_fn = lambda topics: np.mean(npmi_scorer.compute_npmi(
-            topics=topics, vocab=vocab, n=args.eval_words
-        ))
-        topic_terms, npmi = lda.return_optimal_topic_terms(npmi_score_fn)
-        # TODO: full NPMI, not mean
-        save_topics(
-            topic_terms,
-            fpath=Path(args.output_dir, "topics.txt"),
-            n=args.topic_words_to_save,
-        )
-        if args.save_all_topics:
-            for i, topic_terms_i in enumerate(lda.training_topics):
-                save_topics(
-                    topic_terms_i,
-                    fpath=Path(args.output_dir, "topics", f"{i}.txt"),
-                    n=args.topic_words_to_save,
-                )
-    else:
-        est_beta = lda.get_topics()
-        topic_terms = [word_probs.argsort()[::-1] for word_probs in est_beta]
-        npmi = npmi_scorer.compute_npmi(topics=topic_terms, n=args.eval_words)
-        save_topics(
-            [[inv_vocab[w] for w in topic[:100]] for topic in topic_terms],
-            fpath=Path(args.output_dir, "topics.txt"),
-            n=args.topic_words_to_save,
-        )
-        np.save(Path(args.output_dir, "beta.npy"), est_beta)
+    est_beta = lda.get_topics()
+    topic_terms = [word_probs.argsort()[::-1] for word_probs in est_beta]
+    # rough npmi calculation
+    npmi = npmi_scorer.compute_npmi(topics=topic_terms, n=args.eval_words)
+    save_topics(
+        [[inv_vocab[w] for w in topic[:100]] for topic in topic_terms],
+        fpath=Path(args.output_dir, "topics.txt"),
+        n=args.topic_words_to_save,
+    )
+    np.save(Path(args.output_dir, "beta.npy"), est_beta)
+    train_theta = gensim_doc_topic_to_numpy(lda, x_train)
+    np.save(Path(args.output_dir, "train.theta.npy"), train_theta)
+    if args.eval_path and args.eval_path != args.train_path:
+        eval_theta = gensim_doc_topic_to_numpy(lda, x_val)
+        eval_prefix = Path(args.eval_path).stem.split(".")[0]
+        np.save(Path(args.output_dir, f"{eval_prefix}.theta.npy"), eval_theta)
 
     tu = compute_tu(topic_terms, n=args.eval_words)
     to, overlaps = compute_to(topic_terms, n=args.eval_words, return_overlaps=True)
@@ -256,7 +260,7 @@ if __name__ == "__main__":
 
     parser.add("--output_dir", required=True, default=None)
     parser.add("--train_path", default="train.dtm.npz")
-    parser.add("--eval_path", default="val.dtm.npz")
+    parser.add("--eval_path", default=None)
     parser.add("--vocab_path", default="vocab.json")
     parser.add("--eval_split", default=None, type=float)
 

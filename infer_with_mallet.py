@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from gensim.matutils import Sparse2Corpus
 
-from lda import LdaMalletWithBeta
+from lda import LdaMalletWithBeta, gensim_doc_topic_to_numpy
 from utils import load_sparse, load_json
 
 logger = logging.getLogger(__name__)
@@ -32,23 +32,25 @@ def load_mallet_doc_topic(fpath):
         ])
 
 
-def retrieve_estimates(model_dir, eval_data=None, mallet_path=None, **kwargs):
+def retrieve_estimates(model_dir, eval_data_fpath=None, mallet_path=None, **kwargs):
     """
     Loads the mallet model and the topic-word distribution,
     then instantiates the encoder portion and does a forward pass to get the
     training-set document-topic estimates
 
-    If `eval_data` is provided, will infer new document-topic estimates for the data
+    If `eval_data_fpath` is provided, will infer new document-topic estimates for the data
     """
     model_dir = Path(model_dir)
     config = load_yaml(model_dir / "config.yml")
 
     # train estimates will have already been saved, so this terminates early
-    if eval_data is None:
+    if eval_data_fpath is None:
         # Load the text document-topic estimate as a numpy matrix
         topic_word = np.load(model_dir / "beta.npy")
         doc_topic = load_mallet_doc_topic(model_dir / "doctopics.txt")
         return topic_word, doc_topic
+    
+    eval_data = load_sparse(eval_data_fpath)
     
     # NOTE: there is a some hacky moving-about of files because of 
     # mallet/gensim idiosyncracies. basically the logic is:
@@ -92,13 +94,7 @@ def retrieve_estimates(model_dir, eval_data=None, mallet_path=None, **kwargs):
     
     # now do inference (the estimated document-topic dist will be saved automatically)
     eval_data = Sparse2Corpus(eval_data, documents_columns=False)
-    doc_topic_gensim = lda.__getitem__(eval_data, iterations=100) # default is 100
-
-    # convert to numpy
-    doc_topic = np.zeros((len(doc_topic_gensim), config["num_topics"]), dtype=np.float32)
-    for doc_idx, doc in enumerate(doc_topic_gensim):
-        for topic_idx, prob in doc:
-            doc_topic[doc_idx, topic_idx] = prob
+    doc_topic = gensim_doc_topic_to_numpy(lda, eval_data)
     
     # finally, remove the unnecessary files
     (model_dir / "corpus.txt").unlink()
@@ -123,10 +119,9 @@ if __name__ == "__main__":
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    eval_data = load_sparse(args.inference_data_file)
     doc_topic = retrieve_estimates(
         model_dir=args.model_dir,
-        eval_data=eval_data,
+        eval_data_fpath=args.inference_data_file,
         mallet_path=args.mallet_path,
     )
     
