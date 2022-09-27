@@ -72,6 +72,7 @@ class LdaMalletWithBeta(LdaMallet):
             "--optimize-interval", f"{self.optimize_interval}",
 
             "--num-threads", f"{self.workers}",
+            "--output-model", f"{self.prefix}model.mallet",
             "--output-state", f"{self.fstate()}",
             "--output-doc-topics", f"{self.fdoctopics()}",
             "--output-topic-keys", f"{self.ftopickeys()}",
@@ -79,6 +80,8 @@ class LdaMalletWithBeta(LdaMallet):
 
             "--num-iterations", f"{self.iterations}",
             "--inferencer-filename", f"{self.finferencer()}",
+            "--word-topic-counts-file", f"{self.prefix}word-topic-counts.mallet",
+            "--topic-word-weights-file", f"{self.prefix}topic-word-weights.mallet",
             "--doc-topics-threshold", f"{self.topic_threshold}",
             "--random-seed", f"{self.random_seed}"
         ]
